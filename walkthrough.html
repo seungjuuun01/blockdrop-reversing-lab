@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BlockDrop 루팅 우회 → 골드 조작 실습</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2b3947;
+    --text:#e6edf3; --sub:#9aa7b4; --accent:#3fa796; --accent2:#7fb3d5;
+    --warn:#e0a458; --bad:#e06377; --good:#82c4a5; --gold:#ffcd3c; --mono:#c9d7e6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.7}
+  .wrap{max-width:900px;margin:0 auto;padding:40px 20px 80px}
+  header h1{font-size:27px;margin:0 0 6px}
+  header .sub{color:var(--sub);font-size:15px}
+  .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+    color:var(--sub);border-radius:999px;padding:3px 12px;font-size:12px;margin:2px 4px 2px 0}
+  h2{font-size:20px;margin:40px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+  h3{font-size:15px;margin:20px 0 6px;color:var(--accent2)}
+  p{margin:8px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0}
+  .tip{background:linear-gradient(180deg,rgba(63,167,150,.10),transparent);border:1px solid var(--accent)}
+  .warn{background:linear-gradient(180deg,rgba(224,164,88,.10),transparent);border:1px solid var(--warn)}
+  .step{background:linear-gradient(180deg,rgba(127,179,213,.08),transparent);border:1px solid var(--accent2)}
+  code,pre{font-family:"Cascadia Code",Consolas,monospace}
+  pre{background:#0b0e12;border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+    overflow-x:auto;font-size:13px;line-height:1.55;color:var(--mono)}
+  code{background:#0b0e12;padding:1px 5px;border-radius:5px;font-size:.92em;color:var(--mono)}
+  pre code{background:none;padding:0}
+  .hl{color:var(--gold);font-weight:700}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+  @media(max-width:720px){.grid,.grid4{grid-template-columns:1fr}}
+  img.shot{width:100%;border:1px solid var(--line);border-radius:8px;display:block}
+  .cap{font-size:12px;color:var(--sub);text-align:center;margin-top:6px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--sub);font-weight:600;font-size:13px}
+  .tag{font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px}
+  .t-block{background:rgba(224,99,119,.15);color:var(--bad);border:1px solid var(--bad)}
+  .t-ok{background:rgba(130,196,165,.15);color:var(--good);border:1px solid var(--good)}
+  .t-gold{background:rgba(255,205,60,.15);color:var(--gold);border:1px solid var(--gold)}
+  ol,ul{margin:8px 0;padding-left:22px} li{margin:5px 0}
+  b{color:#fff}
+  .kbd{font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--mono)}
+  .disc{color:var(--sub);font-size:13px;border-top:1px solid var(--line);margin-top:40px;padding-top:16px}
+  a{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>BlockDrop — 루팅 우회 → 골드 조작 실습</h1>
+  <div class="sub">순수 Java 테트리스에서 jadx로 판정 함수를 찾고, Frida 한 줄 후킹으로 루팅 게이트와 재화(골드)를 뚫는다</div>
+  <div style="margin-top:12px">
+    <span class="badge">대상: 본인 제작 실습 앱 (authorized)</span>
+    <span class="badge">순수 Java (dex) · jadx 100% 가능</span>
+    <span class="badge">Frida 17 + frida-java-bridge</span>
+    <span class="badge">LDPlayer (x86_64, rooted)</span>
+    <span class="badge">난이도: 입문</span>
+    <span class="badge"><a href="https://github.com/seungjuuun01/blockdrop-reversing-lab">GitHub</a></span>
+  </div>
+</header>
+
+<div class="card tip">
+  <b>한 줄 요약.</b> 이 게임은 "루팅 여부"와 "보유 골드"를 <b>서버가 아니라 앱(클라이언트)</b>에서
+  <code>boolean</code>/<code>int</code> 하나로 판정·저장한다. 그 함수를 jadx로 찾아 Frida로 반환값만 바꿔치기하면
+  <span class="t-block">루팅 차단이 무력화</span>되고 <span class="t-gold">골드가 999,999</span>가 되어 상점을 무한 구매할 수 있다.
+  = 전형적인 <b>클라이언트 사이드 신뢰(client-side trust)</b> 취약점.
+</div>
+
+<h2><span class="n">00</span>무엇을 배우나</h2>
+<ul>
+  <li><b>정적 분석</b>: APK를 jadx로 열어 "어디를 건드릴지"(판정 함수) 찾기</li>
+  <li><b>동적 계측</b>: Frida로 그 함수의 반환값을 실행 중에 바꾸기 (<code>Java.use</code> + <code>.implementation</code>)</li>
+  <li><b>킬체인 연결</b>: 루팅 우회 → 게임 진입 → 재화 조작 → 상점 무한 구매</li>
+  <li><b>방어 관점</b>: 왜 클라이언트 판정은 못 믿는가 / 어떻게 고치는가(서버 검증)</li>
+</ul>
+
+<h2><span class="n">01</span>도구 준비 &amp; 다운로드</h2>
+<table>
+  <tr><th>도구</th><th>용도</th><th>설치/다운로드</th></tr>
+  <tr><td><b>LDPlayer</b> (루팅 x86_64 에뮬)</td><td>실행 대상. <code>adb</code>로 설치/조작</td><td>공식 사이트. 설정에서 root 켜기</td></tr>
+  <tr><td><b>jadx</b> (jadx-gui)</td><td>APK → Java 소스 정적 분석</td><td>GitHub <code>skylot/jadx</code> 릴리스에서 zip 받아 <code>jadx-gui</code> 실행</td></tr>
+  <tr><td><b>frida-server</b> (기기용)</td><td>기기 안에서 후킹을 실행하는 에이전트</td><td>GitHub <code>frida/frida</code> 릴리스에서 <b>android-x86_64</b> 판 다운로드(에뮬 아키텍처와 일치)</td></tr>
+  <tr><td><b>frida-tools</b> (PC)</td><td>spawn/attach 실행(<code>frida</code> CLI)</td><td><code>pip install frida-tools</code> (Python)</td></tr>
+  <tr><td><b>frida-compile</b> (PC)</td><td>훅 스크립트 번들링</td><td><code>npm i -g frida-compile</code> (Node.js 필요)</td></tr>
+</table>
+<div class="card warn">
+  <b>버전 일치 필수.</b> 기기의 <b>frida-server</b> 버전 = PC의 <b>frida</b> 버전(예: 17.x)이 <b>같아야</b> 한다. 다르면 연결/스크립트 로드가 실패한다.
+</div>
+<div class="card warn">
+  <b>Frida 17 함정 (꼭 알기).</b> Frida 17부터 전역 <code>Java</code> 브리지가 코어에서 <b>제거</b>됐다.
+  옛 튜토리얼처럼 그냥 <code>Java.perform</code>을 쓰면 <code>ReferenceError: 'Java' is not defined</code>가 난다.
+  → 스크립트 맨 위에 <code>import Java from "frida-java-bridge"</code>를 넣고 <b>frida-compile로 번들링</b>해야 한다.
+  (이 저장소의 <code>frida/blockdrop_hook.js</code>는 이미 컴파일된 결과라 그냥 실행하면 된다.)
+</div>
+
+<h2><span class="n">02</span>앱 빌드 &amp; 설치</h2>
+<p>분석·후킹의 대상이 되는 <b>BlockDrop.apk</b>를 준비한다. 두 가지 방법:</p>
+<h3>방법 A — 저장소의 완성 APK 바로 설치</h3>
+<pre><code># 저장소를 클론했다면(또는 GitHub에서 BlockDrop.apk 다운로드)
+adb install -r BlockDrop.apk</code></pre>
+<h3>방법 B — 소스에서 직접 빌드(gradle 없이)</h3>
+<pre><code>./build.ps1              # javac → d8 → aapt2 → zipalign → apksigner, 산출물 BlockDrop.apk (~16KB)
+adb install -r BlockDrop.apk</code></pre>
+<div class="card step">
+  이제 기기에 앱이 깔렸다. <b>이 <code>BlockDrop.apk</code>가 곧 jadx로 열고(정찰), Frida로 후킹할(익스플로잇) 대상</b>이다.
+  루팅된 에뮬에서 그냥 실행하면 다음 03에서 볼 "보안 경고"로 막힌다 — 그게 정상이고, 우리가 뚫을 지점이다.
+</div>
+
+<h2><span class="n">03</span>정찰 — jadx로 "루팅 게이트" 찾기</h2>
+<p>순수 Java 앱이라 jadx로 소스가 <b>그대로</b> 보인다(난독화 없음). APK를 jadx-gui로 열고
+<span class="kbd">Ctrl+Shift+F</span> 전체 검색으로 흔적을 따라간다.</p>
+<table>
+  <tr><th>검색어</th><th>이유</th><th>도달</th></tr>
+  <tr><td><code>MainActivity</code></td><td>런처 액티비티 = 시작점</td><td>루팅 분기 발견</td></tr>
+  <tr><td><code>루팅</code> / <code>보안</code></td><td>차단 화면 문자열로 역추적</td><td><code>buildBlockScreen()</code></td></tr>
+  <tr><td>클래스 트리 <code>SecurityCheck</code></td><td>"Security"류 이름은 탐지기 후보</td><td>판정 함수</td></tr>
+</table>
+<p><code>MainActivity</code>를 열면 게이트가 한눈에 보인다:</p>
+<pre><code>// MainActivity.onCreate (jadx 뷰) — 핵심만
+if (SecurityCheck.isDeviceRooted()) {
+    setContentView(buildBlockScreen());        // ⛔ 차단 (탈출 버튼 없음)
+} else {
+    startActivity(new Intent(this, BlockDropActivity.class));  // 게임 진입
+    finish();
+}</code></pre>
+<p><code>SecurityCheck</code>로 이동하면 판정 로직이 전부 노출된다:</p>
+<pre><code>// SecurityCheck.isDeviceRooted (jadx 뷰) — 핵심만
+public static boolean isDeviceRooted() {
+    for (String p : SU_PATHS)                       // su/busybox 파일 존재?
+        if (new File(p).exists()) return true;
+    if (Build.TAGS != null &amp;&amp; Build.TAGS.contains("test-keys")) return true;
+    return false;                                   // ← 정상 기기면 여기
+}</code></pre>
+<div class="card step">
+  <b>여기서 얻는 결론.</b> 판정은 여러 파일 검사로 시작하지만, <b>최종 결과는 <code>boolean</code> 하나</b>다.
+  그리고 <code>MainActivity</code>는 그 <code>boolean</code> <b>하나만</b> 보고 차단/통과를 정한다.
+  → <span class="t-block">후킹 지점 = <code>isDeviceRooted()</code>의 반환값을 <code>false</code>로.</span>
+</div>
+
+<h2><span class="n">04</span>루팅 우회 훅 작성</h2>
+<p>Frida의 가장 기본 패턴: <b>함수의 <code>implementation</code>을 통째로 바꿔치기</b>해서 항상 <code>false</code>를 돌려준다.</p>
+<p style="color:var(--sub);font-size:13px"><b>용어:</b> <code>Java.perform(fn)</code> = 자바 런타임(VM) 안으로 들어가는 진입점(그 안에서만 자바 클래스를 만질 수 있다). <code>Java.use("클래스명")</code> = 그 클래스를 Frida에서 잡는 핸들. <code>.메서드.implementation = 함수</code> = 원본 메서드를 우리 함수로 교체.</p>
+<pre><code>import Java from "frida-java-bridge";   // Frida17 필수
+globalThis.Java = Java;
+
+Java.perform(function () {
+    var SecurityCheck = Java.use("com.reversinglab.blockdrop.SecurityCheck");
+    // 원래 검사(su 파일 등)를 아예 실행하지 않고, 무조건 false 반환
+    SecurityCheck.isDeviceRooted.implementation = function () {
+        return false;                    // ← 이 한 줄이 루팅 게이트를 연다
+    };
+});</code></pre>
+<p><b>왜 되나?</b> <code>MainActivity</code>가 <code>isDeviceRooted()</code>를 부르는 순간, 우리가 심은 함수가
+원본 대신 실행돼 <code>false</code>를 준다 → <code>if(false)</code> → 차단 안 하고 게임으로 진입.</p>
+
+<h2><span class="n">05</span>재화(골드) 조작 훅</h2>
+<p>골드는 <b>메모리의 <code>int</code></b>이고 서버 검증이 없다. jadx로 <code>Wallet</code>을 보면:</p>
+<pre><code>// Wallet (jadx 뷰)
+public static int getGold() { return gold; }                 // 표시 + 잔액확인 공용
+public static boolean spend(int amount) {
+    if (getGold() &gt;= amount) { gold -= amount; return true; } // 잔액확인도 getGold()
+    return false;
+}</code></pre>
+<div class="card step">
+  <b>급소 하나로 통합.</b> 화면 표시도, 상점 구매의 잔액 확인도 <b>모두 <code>getGold()</code></b>를 거친다.
+  → <span class="t-gold">이 함수 하나만 큰 값으로 후킹하면 표시 골드 + 모든 구매가 뚫린다(무한 재화).</span>
+</div>
+<pre><code>    var Wallet = Java.use("com.reversinglab.blockdrop.Wallet");
+    Wallet.getGold.implementation = function () {
+        return 999999;                   // 표시도 999999, 잔액확인도 999999 → 무한 구매
+    };</code></pre>
+<p>두 훅을 합친 최종 스크립트가 <code>frida/blockdrop_hook_src.js</code>다. (초보용 = <code>return false</code> / <code>return 999999</code>로 반환값만 뒤집는 헬로월드 패턴)</p>
+
+<h2><span class="n">06</span>컴파일 &amp; 실행</h2>
+<h3>① 훅 컴파일 (Frida17 브리지 번들링)</h3>
+<pre><code>npx frida-compile frida/blockdrop_hook_src.js -o frida/blockdrop_hook.js
+# (저장소엔 이미 컴파일본이 포함돼 있어 생략 가능)</code></pre>
+<h3>② 기기에 frida-server 넣고 + 기동 + 포트 포워딩</h3>
+<pre><code># (최초 1회) 다운받은 android-x86_64용 frida-server 를 기기에 넣고 실행권한 부여
+adb push frida-server /data/local/tmp/frida-server
+adb shell "su -c 'chmod 755 /data/local/tmp/frida-server'"
+
+# 기동 + 포워딩 (이 랩은 비표준 포트 27043 사용 → 아래 실행에서 -H 로 접속)
+adb shell "su -c 'setsid /data/local/tmp/frida-server -l 0.0.0.0:27043 &lt;/dev/null &gt;/dev/null 2&gt;&amp;1 &amp;'"
+adb forward tcp:27043 tcp:27043</code></pre>
+<p style="color:var(--sub);font-size:13px">※ 일반 튜토리얼은 기본 포트(27042)에 <code>-H</code> 없이 붙지만, 이 랩은 <b>27043</b>에 띄우므로 실행할 때 <code>-H 127.0.0.1:27043</code>로 명시한다.</p>
+<h3>③ spawn으로 후킹 (★ attach 아님)</h3>
+<pre><code>frida -H 127.0.0.1:27043 -f com.reversinglab.blockdrop -l frida/blockdrop_hook.js
+#  또는:  python frida/driver_blockdrop.py</code></pre>
+<div class="card warn">
+  <b>왜 <code>-f</code>(spawn)이고 attach(<code>-p</code>)면 안 되나?</b> 루팅 검사는 앱이 뜨자마자
+  <code>MainActivity.onCreate</code>에서 돈다. 이미 실행 중인 앱에 <b>나중에 붙으면(attach)</b> 판정이 끝난 뒤라 못 막는다.
+  → <b>우리가 앱을 띄우면서(spawn)</b> 후킹해야 첫 판정을 가로챈다.
+</div>
+
+<h2><span class="n">07</span>결과 검증</h2>
+<div class="grid4">
+  <div><img class="shot" src="shots/01_root_blocked.png" alt="루팅 차단 화면">
+    <div class="cap"><span class="tag t-block">① 후킹 전</span> 루팅 감지 → 차단(하드 게이트)</div></div>
+  <div><img class="shot" src="shots/02_game_bypassed.png" alt="우회 후 게임 + 골드 999999">
+    <div class="cap"><span class="tag t-ok">② 우회</span> 차단 스킵 + 골드 999,999</div></div>
+  <div><img class="shot" src="shots/03_shop_hacked.png" alt="상점 보유 골드 999999">
+    <div class="cap"><span class="tag t-gold">③ 상점</span> 조작된 잔액 999,999</div></div>
+  <div><img class="shot" src="shots/04_gold_skin_bought.png" alt="구매 완료 전체 금색">
+    <div class="cap"><span class="tag t-ok">④ 무한 구매</span> 스킨 구매 → 전체 금색</div></div>
+</div>
+<p><b>판정 기준:</b> 후킹 전엔 "보안 경고 · 무결성 검증 실패"로 막히고, 후킹 후엔 차단 화면 없이 게임에 들어가며
+상단 골드가 <b>999,999</b>로 표시된다. 상점에서 500 골드 스킨을 눌러도 잔액이 줄지 않고 계속 구매된다.</p>
+
+<h2><span class="n">08</span>왜 뚫렸나 / 방어법</h2>
+<table>
+  <tr><th>취약점</th><th>근본 원인</th><th>방어</th></tr>
+  <tr><td>루팅 우회</td><td>무결성 판정이 <b>클라이언트에서만</b> 일어남 (앱이 자기 자신을 검사)</td>
+      <td>서버측 원격검증(<b>Play Integrity API</b>). 판정 로직/결과를 클라이언트에 두지 않기</td></tr>
+  <tr><td>골드 조작</td><td>재화가 <b>클라이언트 상태</b>(권위 없음)</td>
+      <td><b>서버 권위 경제</b>: 잔액·구매를 서버가 소유하고 클라는 표시만. 결제는 서버 영수증 검증</td></tr>
+</table>
+<div class="card tip">
+  <b>핵심 교훈.</b> 클라이언트에서 내려주는 <code>boolean</code>/<code>int</code>는 <b>신뢰할 수 없다</b>.
+  온-디바이스 검사는 "장애물"일 뿐 "경계"가 아니다. 진짜 경계는 <b>서버</b>다.
+</div>
+
+<h2><span class="n">09</span>초보 치트시트 &amp; 자주 나는 실수</h2>
+<table>
+  <tr><th>증상</th><th>원인 / 해결</th></tr>
+  <tr><td><code>ReferenceError: 'Java' is not defined</code></td>
+      <td>Frida17에서 원본 <code>.js</code>를 직접 로드함. <b>컴파일된 <code>blockdrop_hook.js</code></b>를 써야 함</td></tr>
+  <tr><td>차단 화면이 그대로 뜸</td><td>attach로 붙음. <b><code>-f</code>로 spawn</b> 다시</td></tr>
+  <tr><td><code>unable to find application ...</code></td><td>① 앱이 기기에 <b>설치 안 됨</b> → <code>adb install -r BlockDrop.apk</code>(02단계). ② 또는 패키지명 오타(<code>com.reversinglab.blockdrop</code>)</td></tr>
+  <tr><td><code>Failed to connect ... frida-server</code></td><td>frida-server 안 떴거나 forward 안 됨. <b>06-②</b> 다시(기동+<code>adb forward</code>)</td></tr>
+  <tr><td>(참고) 다른 앱에서 골드는 큰데 구매가 안 됨</td><td>이 앱은 <code>spend()</code>가 <code>getGold()</code>로 잔액을 보므로 getGold() 후킹만으로 충분. 단, <b>다른 타깃</b>이 잔액을 별도 필드로 검사하면 <code>spend()</code>도 <code>true</code>로 후킹</td></tr>
+</table>
+
+<div class="disc">
+  본 문서는 <b>본인이 제작·소유한 실습 앱</b>을 대상으로 한 모바일 앱 보안 · 리버싱 학습 자료입니다.
+  타인의 앱·서비스를 무단 분석/조작하는 행위는 불법입니다. 소스·APK·훅 전체:
+  <a href="https://github.com/seungjuuun01/blockdrop-reversing-lab">github.com/seungjuuun01/blockdrop-reversing-lab</a>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# 빌드 중간 산출물
+classes/
+classes.dex
+base.apk
+unsigned.apk
+aligned.apk
+*.idsig
+
+# frida 컴파일 소스맵
+frida/*.map
+
+# python
+__pycache__/
+*.pyc

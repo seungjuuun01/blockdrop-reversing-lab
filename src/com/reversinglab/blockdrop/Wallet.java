@@ -12,6 +12,10 @@ public class Wallet {
 
     private static int gold = 0;
 
+    // 메시지함 보상 수령 여부 (이것도 클라이언트 상태 = 리버싱 대상)
+    public static boolean signupClaimed = false;      // 신규가입 100원
+    public static boolean attendanceClaimed = false;  // 오늘 출석 50원
+
     /** ★ Frida 후킹 대상: 이 값을 999999 로 돌려주면 무한 골드. */
     public static int getGold() {
         return gold;

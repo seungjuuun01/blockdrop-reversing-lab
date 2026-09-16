@@ -4,7 +4,9 @@
 import sys, time, frida
 
 PKG = "com.reversinglab.blockdrop"
-HOOK = __file__.rsplit("\\", 1)[0] + "\\blockdrop_hook.js"
+# 기본 훅 = 무한 골드(blockdrop_hook.js). 인자로 다른 훅(예: blockdrop_root_only.js) 지정 가능.
+_HOOK_NAME = sys.argv[1] if len(sys.argv) > 1 else "blockdrop_hook.js"
+HOOK = __file__.rsplit("\\", 1)[0] + "\\" + _HOOK_NAME
 
 def on_message(msg, data):
     if msg.get("type") == "send":

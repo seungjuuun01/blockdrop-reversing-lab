@@ -56,12 +56,19 @@ public class BlockDropActivity extends Activity {
         ctl.addView(btn("⤓", new View.OnClickListener() { public void onClick(View v) { game.hardDrop(); } }));
         root.addView(ctl);
 
-        // 하단 메뉴: 상점 | 메시지함 | 설정
+        // 하단 메뉴: 상점 | 메시지함 | 설정 | 다시시작
         LinearLayout menu = new LinearLayout(this);
         menu.setOrientation(LinearLayout.HORIZONTAL);
-        menu.addView(btn("🛍 상점", new View.OnClickListener() { public void onClick(View v) { openShop(); } }));
-        menu.addView(btn("✉ 메시지함", new View.OnClickListener() { public void onClick(View v) { openMailbox(); } }));
-        menu.addView(btn("⚙ 설정", new View.OnClickListener() { public void onClick(View v) { openSettings(); } }));
+        menu.addView(menuBtn("🛍 상점", new View.OnClickListener() { public void onClick(View v) { openShop(); } }));
+        menu.addView(menuBtn("✉ 메시지함", new View.OnClickListener() { public void onClick(View v) { openMailbox(); } }));
+        menu.addView(menuBtn("⚙ 설정", new View.OnClickListener() { public void onClick(View v) { openSettings(); } }));
+        menu.addView(menuBtn("🔄 다시시작", new View.OnClickListener() {
+            public void onClick(View v) {
+                game.restart();
+                toast("게임을 다시 시작했습니다.");   // 게임을 다시 시작했습니다.
+                refresh();
+            }
+        }));
         root.addView(menu);
 
         setContentView(root);
@@ -74,6 +81,14 @@ public class BlockDropActivity extends Activity {
         b.setTextSize(16);
         b.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         b.setOnClickListener(l);
+        return b;
+    }
+
+    // 하단 메뉴용(4개라 폭이 좁으니 글자 작게 + 좌우 패딩 축소)
+    private Button menuBtn(String text, View.OnClickListener l) {
+        Button b = btn(text, l);
+        b.setTextSize(12);
+        b.setPadding(4, b.getPaddingTop(), 4, b.getPaddingBottom());
         return b;
     }
 

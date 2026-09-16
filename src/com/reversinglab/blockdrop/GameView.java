@@ -131,6 +131,15 @@ public class GameView extends View {
         invalidate();
     }
 
+    /** 게임 다시 시작: 보드·점수 초기화 후 새 조각 스폰(골드·구매 스킨은 유지). */
+    public void restart() {
+        for (int[] row : grid) Arrays.fill(row, 0);
+        score = 0;
+        spawn();
+        if (onChange != null) onChange.run();
+        invalidate();
+    }
+
     // ---- 컨트롤 ----
     public void moveLeft()  { if (!collides(cur, curR, curC - 1)) { curC--; invalidate(); } }
     public void moveRight() { if (!collides(cur, curR, curC + 1)) { curC++; invalidate(); } }
